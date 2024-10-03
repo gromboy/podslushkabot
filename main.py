@@ -1,12 +1,12 @@
 import json
 import datetime as dt
 import asyncio
+from PIL import Image, ImageDraw, ImageFont
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.error import TelegramError, RetryAfter, TimedOut, NetworkError
 import os
-import cairo
 import math
 import io
 
@@ -51,16 +51,18 @@ def save_users_data():
     log('Admins info saved')
 
 
-def wrap_text(context, text, max_width):
+def wrap_text_pil(draw, text, font, max_width):
     """Функция для переноса текста на новые строки, если он превышает максимальную ширину."""
-    words = text.split()
     lines = []
+    words = text.split()
+
     current_line = []
     current_width = 0
 
     for word in words:
-        word_extents = context.text_extents(word + ' ')  # Ширина слова с пробелом
-        word_width = word_extents.width
+        # Получаем размеры текста с пробелом
+        word_bbox = draw.textbbox((0, 0), word + ' ', font=font)
+        word_width = word_bbox[2] - word_bbox[0]  # Ширина текста
 
         if current_width + word_width <= max_width:
             current_line.append(word)
@@ -75,61 +77,54 @@ def wrap_text(context, text, max_width):
 
     return lines
 
-
 def text_to_image(text, padding=40, right_padding_ratio=0.15, line_spacing=1.5, font_size=30,
-                  font='Franklin Gothic Medium'):
+                       font_path='ofont.ru_Franklin Gothic Medium.ttf'):
     # Настройки текста
     text_color = (0, 0, 0)  # Черный текст
-    background_color = (1, 1, 1)  # Белый фон (формат RGB с плавающей запятой)
+    background_color = (255, 255, 255)  # Белый фон (RGB)
 
-    # Создаем временную поверхность для расчета размеров
-    temp_surface = cairo.ImageSurface(cairo.FORMAT_RGB24, 1, 1)
-    temp_context = cairo.Context(temp_surface)
-    temp_context.select_font_face(font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-    temp_context.set_font_size(font_size)
+    # Загрузить шрифт
+    if font_path is None:
+        font = ImageFont.load_default()  # Использовать стандартный шрифт
+    else:
+        font = ImageFont.truetype(font_path, font_size)  # Использовать кастомный шрифт
 
-    # Определяем максимальную ширину строки (например, 600 пикселей) с учетом правого отступа
+    # Создаем временное изображение для расчета размеров текста
+    temp_image = Image.new('RGB', (1, 1), background_color)
+    draw = ImageDraw.Draw(temp_image)
+
+    # Определяем максимальную ширину строки с учетом правого отступа
     max_width = 600
     max_text_width = max_width * (1 - right_padding_ratio)  # Учитываем отступ справа
 
     # Получаем строки с переносом
-    lines = wrap_text(temp_context, text, max_text_width)
+    lines = wrap_text_pil(draw, text, font, max_text_width)
 
     # Рассчитываем высоту и ширину изображения
-    line_extents = temp_context.text_extents('X')  # Высота строки
-    line_height = line_extents.height
+    line_height = draw.textbbox((0, 0), 'X', font=font)[3]  # Высота одной строки
     text_height = line_height * len(lines) * line_spacing  # Высота всего текста с учетом межстрочного интервала
 
     # Добавляем отступы
     img_width = max_width + 2 * padding
     img_height = math.ceil(text_height + 2 * padding)
 
-    # Создаем реальную поверхность с нужными размерами
-    surface = cairo.ImageSurface(cairo.FORMAT_RGB24, img_width, img_height)
-    context = cairo.Context(surface)
-
-    # Заливаем фон белым цветом
-    context.set_source_rgb(*background_color)
-    context.paint()
-
-    # Настройки текста
-    context.set_source_rgb(*text_color)
-    context.select_font_face(font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-    context.set_font_size(font_size)
+    # Создаем изображение с нужными размерами
+    image = Image.new('RGB', (img_width, img_height), background_color)
+    draw = ImageDraw.Draw(image)
 
     # Рисуем текст по строкам
-    y_offset = padding + line_height  # Начинаем рисовать с учетом верхнего отступа
+    y_offset = padding  # Начинаем рисовать с учетом верхнего отступа
 
     for line in lines:
-        line_extents = context.text_extents(line)
-        x_offset = padding  # Слева отступ фиксированный
-        context.move_to(x_offset, y_offset)
-        context.show_text(line)
+        line_bbox = draw.textbbox((0, 0), line, font=font)
+        line_width = line_bbox[2] - line_bbox[0]  # Ширина строки
+        x_offset = padding  # Отступ слева
+        draw.text((x_offset, y_offset), line, font=font, fill=text_color)
         y_offset += line_height * line_spacing  # Смещаем по вертикали с учетом интервала между строками
 
-    # Сохраняем изображение
+    # Сохраняем изображение в поток (BytesIO)
     image_data = io.BytesIO()
-    surface.write_to_png(image_data)  # Сохраняем изображение в поток
+    image.save(image_data, format='PNG')  # Сохраняем изображение в поток как PNG
     image_data.seek(0)  # Возвращаем указатель в начало потока
 
     return image_data

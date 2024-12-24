@@ -135,7 +135,7 @@ def text_to_image(text, color, padding=40, right_padding_ratio=0.15, line_spacin
     # tree_alpha = tree.split()[-1]
     # image.paste(tree, (0, img_height // 2 - 48), mask=tree_alpha)
 
-    santa = Image.open(f'santa{1 if color[0] > 125 else 2}.jpg').convert('RGB')
+    santa = Image.open(f'santa{1 if color[0] > 125 else 2}.png').convert('RGB')
     we, he = santa.size
     santa = santa.resize((we // 20, he // 20))
     image.paste(santa, (15, img_height // 2 - 30))

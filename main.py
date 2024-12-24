@@ -1,3 +1,4 @@
+from random import randint
 import json
 import datetime as dt
 import asyncio
@@ -77,8 +78,9 @@ def wrap_text_pil(draw, text, font, max_width):
 
     return lines
 
-def text_to_image(text, padding=40, right_padding_ratio=0.15, line_spacing=1.5, font_size=30,
-                       font_path='ofont.ru_Franklin Gothic Medium.ttf'):
+
+def text_to_image(text, color, padding=40, right_padding_ratio=0.15, line_spacing=1.5, font_size=30,
+                  font_path='ofont.ru_Franklin Gothic Medium.ttf'):
     # Настройки текста
     text_color = (0, 0, 0)  # Черный текст
     background_color = (255, 255, 255)  # Белый фон (RGB)
@@ -118,9 +120,20 @@ def text_to_image(text, padding=40, right_padding_ratio=0.15, line_spacing=1.5, 
     for line in lines:
         line_bbox = draw.textbbox((0, 0), line, font=font)
         line_width = line_bbox[2] - line_bbox[0]  # Ширина строки
-        x_offset = padding  # Отступ слева
+        x_offset = padding + 60  # Отступ слева
         draw.text((x_offset, y_offset), line, font=font, fill=text_color)
         y_offset += line_height * line_spacing  # Смещаем по вертикали с учетом интервала между строками
+
+    tree = Image.open('per.png').convert('RGBA')
+    pixels = tree.load()
+    for x in range(tree.width):
+        for y in range(tree.height):
+            if pixels[x, y][0:3] == (108, 25, 255):
+                pixels[x, y] = color
+    we, he = tree.size
+    tree = tree.resize((he - 10, we - 10))
+    tree_alpha = tree.split()[-1]
+    image.paste(tree, (0, img_height // 2 - 48), mask=tree_alpha)
 
     # Сохраняем изображение в поток (BytesIO)
     image_data = io.BytesIO()
@@ -211,13 +224,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 #         log(f"Failed to send message to {chat_id} after {retries} attempts.")
 
 
-async def send_photo_with_retry(bot, chat_id, photo_file, caption, retries=5, ismes=False):
+async def send_photo_with_retry(bot, chat_id, photo_file, caption, color=(0, 0, 0), retries=5, ismes=False):
     """Отправка сообщения с повторной попыткой при возникновении ошибок."""
     for attempt in range(retries):
         try:
             # Попытка отправки сообщения
             if ismes:
-                await bot.send_photo(chat_id=chat_id, photo=text_to_image(photo_file), caption=caption)
+                await bot.send_photo(chat_id=chat_id, photo=text_to_image(photo_file, color), caption=caption)
             else:
                 await bot.send_photo(chat_id=chat_id, photo=photo_file, caption=caption)
             log(f"Photo sent successfully to {chat_id}")
@@ -242,13 +255,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.message.chat_id
     if user_id in pending_messages:
         await update.message.reply_text("✅ Сообщение отправлено ✅")
+        colors = (randint(0, 255), randint(0, 255), randint(0, 255))
         for target_user_id in users_data[:]:
             log(f'Trying to send "{update.message.text[0:40]}" from {user_id} to {target_user_id}')
             a = ''
             if target_user_id in super_admins:
                 a = '\n\nот @' + str(update.message.from_user['username'])
 
-            await send_photo_with_retry(context.bot, chat_id=target_user_id, photo_file=update.message.text,
+            await send_photo_with_retry(context.bot, color=colors, chat_id=target_user_id,
+                                        photo_file=update.message.text,
                                         caption=f"{a}", ismes=True)
 
         pending_messages.remove(user_id)

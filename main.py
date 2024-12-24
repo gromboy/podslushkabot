@@ -211,12 +211,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 #         log(f"Failed to send message to {chat_id} after {retries} attempts.")
 
 
-async def send_photo_with_retry(bot, chat_id, photo_file, caption, retries=5):
+async def send_photo_with_retry(bot, chat_id, photo_file, caption, retries=5, ismes=False):
     """Отправка сообщения с повторной попыткой при возникновении ошибок."""
     for attempt in range(retries):
         try:
             # Попытка отправки сообщения
-            await bot.send_photo(chat_id=chat_id, photo=text_to_image(photo_file), caption=caption)
+            if ismes:
+                await bot.send_photo(chat_id=chat_id, photo=text_to_image(photo_file), caption=caption)
+            else:
+                await bot.send_photo(chat_id=chat_id, photo=photo_file, caption=caption)
             log(f"Photo sent successfully to {chat_id}")
             return  # Если сообщение отправлено успешно, выходим из функции
         except RetryAfter as e:
@@ -246,7 +249,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 a = '\n\nот @' + str(update.message.from_user['username'])
 
             await send_photo_with_retry(context.bot, chat_id=target_user_id, photo_file=update.message.text,
-                                        caption=f"{a}")
+                                        caption=f"{a}", ismes=True)
 
         pending_messages.remove(user_id)
     else:

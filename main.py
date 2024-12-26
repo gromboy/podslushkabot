@@ -10,6 +10,7 @@ from telegram.error import TelegramError, RetryAfter, TimedOut, NetworkError
 import os
 import math
 import io
+import re
 
 DATA_FILE = 'users_data.json'
 
@@ -25,6 +26,18 @@ help_text = '''Это новый бот подслушки для анонимн
 
 def log(a):
     print(f'[] {dt.datetime.now()} - {a}')
+
+
+def links_slice(s):
+    pattern = r'(https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?)'
+    links = re.findall(pattern, s)
+
+    for i, j in enumerate(links):
+        s = s.replace(j, f'*link {i + 1}*')
+
+    links = [f'lnk{i + 1}: {j}' for i, j in enumerate(links[:])]
+
+    return s, '\n'.join(links)
 
 
 def load_users_data():
@@ -258,17 +271,18 @@ async def send_photo_with_retry(bot, chat_id, photo_file, caption, color=(0, 0, 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.message.chat_id
+    text_to_send, links = links_slice(update.message.text)
     if user_id in pending_messages:
         await update.message.reply_text("✅ Сообщение отправлено ✅")
         colors = (randint(0, 255), randint(0, 255), randint(0, 255))
         for target_user_id in users_data[:]:
             log(f'Trying to send "{update.message.text[0:40]}" from {user_id} to {target_user_id}')
-            a = ''
+            a = links
             if target_user_id in super_admins:
                 a = '\n\nот @' + str(update.message.from_user['username'])
 
             await send_photo_with_retry(context.bot, color=colors, chat_id=target_user_id,
-                                        photo_file=update.message.text,
+                                        photo_file=text_to_send,
                                         caption=f"{a}", ismes=True)
 
         pending_messages.remove(user_id)

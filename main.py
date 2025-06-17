@@ -137,21 +137,21 @@ def text_to_image(text, color, padding=40, right_padding_ratio=0.15, line_spacin
         draw.text((x_offset, y_offset), line, font=font, fill=text_color)
         y_offset += line_height * line_spacing  # Смещаем по вертикали с учетом интервала между строками
 
-    # tree = Image.open('per.png').convert('RGBA')
-    # pixels = tree.load()
-    # for x in range(tree.width):
-    #     for y in range(tree.height):
-    #         if pixels[x, y][0:3] == (108, 25, 255):
-    #             pixels[x, y] = color
-    # we, he = tree.size
-    # tree = tree.resize((he - 10, we - 10))
-    # tree_alpha = tree.split()[-1]
-    # image.paste(tree, (0, img_height // 2 - 48), mask=tree_alpha)
+    tree = Image.open('per.png').convert('RGBA')
+    pixels = tree.load()
+    for x in range(tree.width):
+        for y in range(tree.height):
+            if pixels[x, y][0:3] == (108, 25, 255):
+                pixels[x, y] = color
+    we, he = tree.size
+    tree = tree.resize((he - 10, we - 10))
+    tree_alpha = tree.split()[-1]
+    image.paste(tree, (0, img_height // 2 - 48), mask=tree_alpha)
 
-    santa = Image.open(f'santa{1 if color[0] > 125 else 2}.png').convert('RGB')
-    we, he = santa.size
-    santa = santa.resize((we // 20, he // 20))
-    image.paste(santa, (15, img_height // 2 - 30))
+    #santa = Image.open(f'santa{1 if color[0] > 125 else 2}.png').convert('RGB')
+    #we, he = santa.size
+    #santa = santa.resize((we // 20, he // 20))
+    #image.paste(santa, (15, img_height // 2 - 30))
 
     # Сохраняем изображение в поток (BytesIO)
     image_data = io.BytesIO()
